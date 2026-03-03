@@ -10,11 +10,10 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
 
-const GOOGLE_VISION_KEY = process.env.GOOGLE_CLOUD_VISION_API_KEY;
-
 // ── Google Cloud Vision ──────────────────────────────────────────────────────
 
 async function visionOcr(filePath, mimeType) {
+  const GOOGLE_VISION_KEY = process.env.GOOGLE_CLOUD_VISION_API_KEY;
   if (!GOOGLE_VISION_KEY) return null;
 
   try {
