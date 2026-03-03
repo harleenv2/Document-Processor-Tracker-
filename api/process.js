@@ -18,6 +18,28 @@ function nameKey(name) {
   return name.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
+// Extract meaningful tokens from a name (words 3+ chars) for KYC clustering
+function nameTokens(name) {
+  return new Set(nameKey(name).split(' ').filter((t) => t.length >= 3));
+}
+
+// Add a KYC file to an existing cluster if any name token matches, else create a new cluster.
+// This handles reversed names ("Ibragim Salpagarov" vs "Salpagarov Ibragim") and
+// slight spelling variants that share a common first name token.
+function addToKycCluster(clusters, personName, file) {
+  const tokens = nameTokens(personName);
+  const match = clusters.find((c) => {
+    for (const t of tokens) if (c.allTokens.has(t)) return true;
+    return false;
+  });
+  if (match) {
+    match.files.push(file);
+    for (const t of tokens) match.allTokens.add(t);
+  } else {
+    clusters.push({ displayName: personName, files: [file], allTokens: tokens });
+  }
+}
+
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -68,10 +90,8 @@ export async function processHandler(req, res) {
     );
 
     // Step 2: Group files into buckets
-    // Keys are normalised (lowercase, collapsed spaces) to catch case/whitespace mismatches.
-    // Each entry is { displayName, files[] } — displayName is the first name seen for the key.
-    const kycGroups = new Map();
-    const bankGroups = new Map();
+    const kycClusters = []; // [{ displayName, files, allTokens }]
+    const bankGroups = new Map();   // normalised name key -> { displayName, files }
     const payslipGroups = new Map();
     const individualFiles = [];
 
@@ -84,7 +104,7 @@ export async function processHandler(req, res) {
     for (const file of files) {
       const { docType, personName } = file;
       if (KYC_TYPES.has(docType)) {
-        addToGroup(kycGroups, personName, file);
+        addToKycCluster(kycClusters, personName, file);
       } else if (docType === 'Bank Statement') {
         addToGroup(bankGroups, personName, file);
       } else if (docType === 'Pay Slip') {
@@ -105,7 +125,7 @@ export async function processHandler(req, res) {
     }
 
     // KYC merges
-    for (const { displayName, files: group } of kycGroups.values()) {
+    for (const { displayName, files: group } of kycClusters) {
       const buffers = group.map((f) => pdfBuffers.get(f.fileId));
       const merged = buffers.length > 1 ? await mergePdfs(buffers) : buffers[0];
       const baseName = `KYC_${sanitiseName(displayName)}`;
