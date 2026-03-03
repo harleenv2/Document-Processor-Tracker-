@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0",
+    "@azure-rest/ai-document-intelligence": "^1.1.0",
     "adm-zip": "^0.5.16",
     "archiver": "^7.0.1",
     "cors": "^2.8.5",
