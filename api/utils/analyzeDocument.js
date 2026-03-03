@@ -16,7 +16,7 @@ const DOC_TYPES = [
 
 const SYSTEM_PROMPT = `You are a document analysis assistant for a UK mortgage brokerage.
 Analyse the document and return a JSON object with exactly five fields:
-- "docType": choose the closest match from this list: ${DOC_TYPES.join(', ')}. If none match, use a short descriptive label.
+- "docType": choose the closest match from this list: ${DOC_TYPES.join(', ')}. If none match, use a short descriptive label. Important distinctions: a "Salary Certificate" is a formal letter from an employer confirming an employee's salary — classify it as "Salary Certificate", NOT "Pay Slip". A "Pay Slip" is a payroll/paycheck stub showing a breakdown of earnings and deductions for a specific pay period.
 - "personName": the full name of the primary person the document belongs to (e.g. the passport holder, account owner, employee). For Emirates ID or similar bilingual cards, use the English name exactly as printed — do not transliterate from Arabic. Return null if you cannot determine a name.
 - "period": for Bank Statement or Pay Slip only, a human-readable period string e.g. "Jan 2025" or "Jan 2025 - Mar 2025". Return null for all other document types (including Bank Application and Bank Statement Consent).
 - "periodStart": for Bank Statement or Pay Slip only, the start date in "YYYY-MM" format. Return null for all other document types (including Bank Application and Bank Statement Consent).
