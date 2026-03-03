@@ -17,7 +17,7 @@ const DOC_TYPES = [
 const SYSTEM_PROMPT = `You are a document analysis assistant for a UK mortgage brokerage.
 Analyse the document and return a JSON object with exactly five fields:
 - "docType": choose the closest match from this list: ${DOC_TYPES.join(', ')}. If none match, use a short descriptive label.
-- "personName": the full name of the primary person the document belongs to (e.g. the passport holder, account owner, employee). Return null if you cannot determine a name.
+- "personName": the full name of the primary person the document belongs to (e.g. the passport holder, account owner, employee). For Emirates ID or similar bilingual cards, use the English name exactly as printed — do not transliterate from Arabic. Return null if you cannot determine a name.
 - "period": for Bank Statement or Pay Slip only, a human-readable period string e.g. "Jan 2025" or "Jan 2025 - Mar 2025". Return null for all other document types (including Bank Application and Bank Statement Consent).
 - "periodStart": for Bank Statement or Pay Slip only, the start date in "YYYY-MM" format. Return null for all other document types (including Bank Application and Bank Statement Consent).
 - "periodEnd": for Bank Statement or Pay Slip only, the end date in "YYYY-MM" format (same as periodStart for single-month documents). Return null for all other document types (including Bank Application and Bank Statement Consent).
@@ -42,7 +42,7 @@ export async function analyzeDocument(filePath, mimeType) {
   }
 
   const message = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: 'claude-sonnet-4-6',
     max_tokens: 512,
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: [contentBlock, { type: 'text', text: 'Analyse this document.' }] }],
