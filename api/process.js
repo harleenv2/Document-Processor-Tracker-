@@ -13,6 +13,11 @@ function sanitiseName(name) {
   return name.replace(/[/\\:*?"<>|]/g, '_').trim() || 'file';
 }
 
+// Normalise a person name to a consistent grouping key
+function nameKey(name) {
+  return name.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -63,22 +68,27 @@ export async function processHandler(req, res) {
     );
 
     // Step 2: Group files into buckets
-    const kycGroups = new Map();    // personName -> file[]
-    const bankGroups = new Map();   // personName -> file[]
-    const payslipGroups = new Map(); // personName -> file[]
+    // Keys are normalised (lowercase, collapsed spaces) to catch case/whitespace mismatches.
+    // Each entry is { displayName, files[] } — displayName is the first name seen for the key.
+    const kycGroups = new Map();
+    const bankGroups = new Map();
+    const payslipGroups = new Map();
     const individualFiles = [];
+
+    function addToGroup(map, personName, file) {
+      const key = nameKey(personName);
+      if (!map.has(key)) map.set(key, { displayName: personName, files: [] });
+      map.get(key).files.push(file);
+    }
 
     for (const file of files) {
       const { docType, personName } = file;
       if (KYC_TYPES.has(docType)) {
-        if (!kycGroups.has(personName)) kycGroups.set(personName, []);
-        kycGroups.get(personName).push(file);
+        addToGroup(kycGroups, personName, file);
       } else if (docType === 'Bank Statement') {
-        if (!bankGroups.has(personName)) bankGroups.set(personName, []);
-        bankGroups.get(personName).push(file);
+        addToGroup(bankGroups, personName, file);
       } else if (docType === 'Pay Slip') {
-        if (!payslipGroups.has(personName)) payslipGroups.set(personName, []);
-        payslipGroups.get(personName).push(file);
+        addToGroup(payslipGroups, personName, file);
       } else {
         individualFiles.push(file);
       }
@@ -95,15 +105,15 @@ export async function processHandler(req, res) {
     }
 
     // KYC merges
-    for (const [personName, group] of kycGroups) {
+    for (const { displayName, files: group } of kycGroups.values()) {
       const buffers = group.map((f) => pdfBuffers.get(f.fileId));
       const merged = buffers.length > 1 ? await mergePdfs(buffers) : buffers[0];
-      const baseName = `KYC_${sanitiseName(personName)}`;
+      const baseName = `KYC_${sanitiseName(displayName)}`;
       await fs.writeFile(path.join(outputDir, resolveFilename(baseName)), merged);
     }
 
     // Bank Statement merges
-    for (const [personName, group] of bankGroups) {
+    for (const { displayName, files: group } of bankGroups.values()) {
       const sorted = group
         .filter((f) => f.periodStart)
         .sort((a, b) => a.periodStart.localeCompare(b.periodStart));
@@ -116,15 +126,15 @@ export async function processHandler(req, res) {
       let baseName;
       if (sorted.length > 0) {
         const label = buildPeriodLabel(sorted);
-        baseName = `Bank Statement_${sanitiseName(personName)}_${sanitiseName(label)}`;
+        baseName = `Bank Statement_${sanitiseName(displayName)}_${sanitiseName(label)}`;
       } else {
-        baseName = `Bank Statement_${sanitiseName(personName)}`;
+        baseName = `Bank Statement_${sanitiseName(displayName)}`;
       }
       await fs.writeFile(path.join(outputDir, resolveFilename(baseName)), merged);
     }
 
     // Payslip merges
-    for (const [personName, group] of payslipGroups) {
+    for (const { displayName, files: group } of payslipGroups.values()) {
       const sorted = group
         .filter((f) => f.periodStart)
         .sort((a, b) => a.periodStart.localeCompare(b.periodStart));
@@ -137,9 +147,9 @@ export async function processHandler(req, res) {
       let baseName;
       if (sorted.length > 0) {
         const label = buildPeriodLabel(sorted);
-        baseName = `Payslips_${sanitiseName(personName)}_${sanitiseName(label)}`;
+        baseName = `Payslips_${sanitiseName(displayName)}_${sanitiseName(label)}`;
       } else {
-        baseName = `Payslips_${sanitiseName(personName)}`;
+        baseName = `Payslips_${sanitiseName(displayName)}`;
       }
       await fs.writeFile(path.join(outputDir, resolveFilename(baseName)), merged);
     }

@@ -124,8 +124,18 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>Credit Ops Document Tool</h1>
-        <p className="subtitle">Upload, rename, convert and package case documents</p>
+        <div className="app-header-inner">
+          <div className="app-logo">
+            <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="logo-mark">
+              <rect width="40" height="40" rx="10" fill="#2655F5"/>
+              <text x="20" y="28" fontFamily="Arial" fontWeight="800" fontSize="24" fill="white" textAnchor="middle">H</text>
+            </svg>
+            <div>
+              <h1><span className="brand-name">Huspy</span> Document Processor</h1>
+              <p className="subtitle">Upload, rename, convert and package case documents</p>
+            </div>
+          </div>
+        </div>
       </header>
 
       <main className="app-main">
