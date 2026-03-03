@@ -9,7 +9,9 @@ export const ALL_DOC_TYPES = [
   'Marriage Certificate',
 
   // Financial
+  'Bank Application',
   'Bank Statement',
+  'Bank Statement Consent',
   'Pay Slip',
   'Salary Certificate',
   'Salary Transfer Letter',

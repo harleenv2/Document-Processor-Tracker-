@@ -1,5 +1,8 @@
 const DOC_TYPE_MAP = [
   { label: 'Passport',             keywords: ['passport'] },
+  { label: 'Bank Application',     keywords: ['bank app', 'loan app', 'application'] },
+  { label: 'Bank Statement Consent', keywords: ['consent', 'mandate', 'authoris', 'authoriz', 'authority'] },
+  { label: 'Mortgage Statement',   keywords: ['mortgage'] },
   { label: 'Bank Statement',       keywords: ['bank', 'statement', 'bankstatement'] },
   { label: 'Pay Slip',             keywords: ['payslip', 'payroll', 'salary', 'wage'] },
   { label: 'P60',                  keywords: ['p60'] },
@@ -10,7 +13,6 @@ const DOC_TYPE_MAP = [
   { label: 'Council Tax',          keywords: ['council'] },
   { label: 'Employment Letter',    keywords: ['employment', 'employer', 'contract'] },
   { label: 'Accountant Letter',    keywords: ['accountant'] },
-  { label: 'Mortgage Statement',   keywords: ['mortgage'] },
   { label: 'Reference Letter',     keywords: ['reference'] },
   { label: 'ID Document',          keywords: ['id', 'identity', 'identification'] },
 ];

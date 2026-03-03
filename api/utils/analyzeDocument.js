@@ -7,7 +7,7 @@ const DOC_TYPES = [
   // Identity
   'Passport', 'Emirates ID', 'Driving Licence', 'ID Document', 'Residence Visa', 'Marriage Certificate',
   // Financial
-  'Bank Statement', 'Pay Slip', 'Salary Certificate', 'Salary Transfer Letter', 'P60', 'P45', 'SA302', 'Mortgage Statement',
+  'Bank Application', 'Bank Statement', 'Bank Statement Consent', 'Pay Slip', 'Salary Certificate', 'Salary Transfer Letter', 'P60', 'P45', 'SA302', 'Mortgage Statement',
   // Employment
   'Employment Letter', 'NOC Letter', 'Accountant Letter', 'Reference Letter', 'Trade License',
   // Property & Utilities
@@ -18,9 +18,9 @@ const SYSTEM_PROMPT = `You are a document analysis assistant for a UK mortgage b
 Analyse the document and return a JSON object with exactly five fields:
 - "docType": choose the closest match from this list: ${DOC_TYPES.join(', ')}. If none match, use a short descriptive label.
 - "personName": the full name of the primary person the document belongs to (e.g. the passport holder, account owner, employee). Return null if you cannot determine a name.
-- "period": for Bank Statement or Pay Slip only, a human-readable period string e.g. "Jan 2025" or "Jan 2025 - Mar 2025". Return null for all other document types.
-- "periodStart": for Bank Statement or Pay Slip only, the start date in "YYYY-MM" format. Return null for all other document types.
-- "periodEnd": for Bank Statement or Pay Slip only, the end date in "YYYY-MM" format (same as periodStart for single-month documents). Return null for all other document types.
+- "period": for Bank Statement or Pay Slip only, a human-readable period string e.g. "Jan 2025" or "Jan 2025 - Mar 2025". Return null for all other document types (including Bank Application and Bank Statement Consent).
+- "periodStart": for Bank Statement or Pay Slip only, the start date in "YYYY-MM" format. Return null for all other document types (including Bank Application and Bank Statement Consent).
+- "periodEnd": for Bank Statement or Pay Slip only, the end date in "YYYY-MM" format (same as periodStart for single-month documents). Return null for all other document types (including Bank Application and Bank Statement Consent).
 Return ONLY valid JSON, no markdown, no explanation.`;
 
 export async function analyzeDocument(filePath, mimeType) {
