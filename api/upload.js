@@ -8,6 +8,24 @@ import { detectDocType } from './utils/detectDocType.js';
 import { analyzeDocument } from './utils/analyzeDocument.js';
 import { extractZip } from './utils/extractZip.js';
 
+// Retry analyzeDocument up to 3 times on rate-limit errors (429 / overloaded)
+async function analyzeDocumentWithRetry(filePath, mimeType, attempts = 3) {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await analyzeDocument(filePath, mimeType);
+    } catch (err) {
+      const isRateLimit = err.status === 529 || err.status === 429 || /overloaded|rate.limit/i.test(err.message);
+      if (isRateLimit && attempt < attempts) {
+        const wait = attempt * 8000; // 8s, 16s backoff
+        console.warn(`[AI] Rate limited, retrying in ${wait / 1000}s (attempt ${attempt}/${attempts})...`);
+        await new Promise((r) => setTimeout(r, wait));
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
 const ALLOWED_MIMES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
 const ZIP_MIMES = new Set(['application/zip', 'application/x-zip-compressed']);
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB per file
@@ -79,13 +97,16 @@ export function uploadHandler(req, res) {
       return res.status(400).json({ error: 'ZIP was empty or contained no supported files.' });
     }
 
-    // Run AI analysis in batches of 3 to avoid API rate limits
-    const BATCH_SIZE = 3;
+    // Run AI analysis in batches to avoid API rate limits
+    const BATCH_SIZE = 2;
+    const BATCH_DELAY_MS = 3000; // 3s between batches to avoid rate limiting
     const analysisResults = [];
+
     for (let i = 0; i < toAnalyse.length; i += BATCH_SIZE) {
+      if (i > 0) await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
       const batch = toAnalyse.slice(i, i + BATCH_SIZE);
       const batchResults = await Promise.allSettled(
-        batch.map((f) => analyzeDocument(f.savedPath, f.mimeType))
+        batch.map((f) => analyzeDocumentWithRetry(f.savedPath, f.mimeType))
       );
       batchResults.forEach((r, j) => {
         const f = batch[j];
