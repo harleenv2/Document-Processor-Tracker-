@@ -79,10 +79,16 @@ export function uploadHandler(req, res) {
       return res.status(400).json({ error: 'ZIP was empty or contained no supported files.' });
     }
 
-    // Run AI analysis for all files in parallel
-    const analysisResults = await Promise.allSettled(
-      toAnalyse.map((f) => analyzeDocument(f.savedPath, f.mimeType))
-    );
+    // Run AI analysis in batches of 3 to avoid API rate limits
+    const BATCH_SIZE = 3;
+    const analysisResults = [];
+    for (let i = 0; i < toAnalyse.length; i += BATCH_SIZE) {
+      const batch = toAnalyse.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map((f) => analyzeDocument(f.savedPath, f.mimeType))
+      );
+      analysisResults.push(...batchResults);
+    }
 
     const files = toAnalyse.map((f, i) => {
       const result = analysisResults[i];
