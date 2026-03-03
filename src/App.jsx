@@ -24,19 +24,27 @@ export default function App() {
       if (!res.ok) throw new Error(data.error || 'Upload failed');
 
       setJobId(data.jobId);
-      setFiles((prev) => [
-        ...prev,
-        ...data.files.map((f, i) => ({
+      let directIdx = 0;
+      const newFiles = data.files.map((f) => {
+        const srcFile = f.fromZip ? null : accepted[directIdx++];
+        return {
           id: f.fileId,
-          file: accepted[i],
+          fileJobId: data.jobId,
           originalName: f.originalName,
           size: f.size,
           mimeType: f.mimeType,
           docType: f.detectedDocType,
-          personName: '',
-          preview: f.mimeType.startsWith('image/') ? URL.createObjectURL(accepted[i]) : null,
-        })),
-      ]);
+          personName: f.personName || '',
+          period: f.period || null,
+          periodStart: f.periodStart || null,
+          periodEnd: f.periodEnd || null,
+          aiAnalyzed: f.aiAnalyzed || false,
+          preview: (!f.fromZip && srcFile?.type?.startsWith('image/'))
+            ? URL.createObjectURL(srcFile)
+            : null,
+        };
+      });
+      setFiles((prev) => [...prev, ...newFiles]);
       setStatus('idle');
     } catch (err) {
       setErrorMsg(err.message);
@@ -71,8 +79,12 @@ export default function App() {
           caseRef: caseRef.trim() || 'documents',
           files: files.map((f) => ({
             fileId: f.id,
+            fileJobId: f.fileJobId,
             docType: f.docType,
             personName: f.personName,
+            period: f.period,
+            periodStart: f.periodStart,
+            periodEnd: f.periodEnd,
             mimeType: f.mimeType,
             originalName: f.originalName,
           })),
@@ -162,7 +174,7 @@ export default function App() {
         {(status === 'uploading' || status === 'processing') && (
           <div className="progress-overlay">
             <div className="spinner" />
-            <p>{status === 'uploading' ? 'Uploading files...' : 'Processing & building ZIP...'}</p>
+            <p>{status === 'uploading' ? 'Uploading & analysing documents…' : 'Processing & building ZIP...'}</p>
           </div>
         )}
       </main>

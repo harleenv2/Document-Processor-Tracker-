@@ -126,6 +126,20 @@ body {
   white-space: nowrap;
 }
 
+.ai-badge {
+  display: inline-block;
+  font-size: .65rem;
+  font-weight: 700;
+  color: #1a3a6b;
+  background: #dde8f8;
+  border: 1px solid #b3c9ee;
+  border-radius: 4px;
+  padding: .1rem .35rem;
+  margin-bottom: .3rem;
+  letter-spacing: .03em;
+  vertical-align: middle;
+}
+
 .doc-type-select, .person-name-input {
   padding: .4rem .6rem;
   border: 1px solid #ccd2db;
@@ -135,6 +149,13 @@ body {
 }
 .doc-type-select:focus, .person-name-input:focus { outline: 2px solid #1a3a6b; outline-offset: 1px; }
 .person-name-input.empty { border-color: #f87171; }
+
+.period-hint {
+  font-size: .75rem;
+  color: #6b7a95;
+  font-style: italic;
+  margin-top: .25rem;
+}
 
 .btn-remove {
   background: none;

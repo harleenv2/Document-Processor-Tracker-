@@ -7,7 +7,7 @@ function formatSize(bytes) {
 }
 
 export default function FileRow({ file, onUpdate, onRemove }) {
-  const { id, originalName, size, mimeType, docType, personName, preview } = file;
+  const { id, originalName, size, mimeType, docType, personName, period, preview, aiAnalyzed } = file;
 
   return (
     <tr>
@@ -24,6 +24,7 @@ export default function FileRow({ file, onUpdate, onRemove }) {
       </td>
 
       <td>
+        {aiAnalyzed && <span className="ai-badge" title="Auto-filled by AI">✦ AI</span>}
         <select
           className="doc-type-select"
           value={docType}
@@ -47,6 +48,9 @@ export default function FileRow({ file, onUpdate, onRemove }) {
           value={personName}
           onChange={(e) => onUpdate(id, 'personName', e.target.value)}
         />
+        {(docType === 'Bank Statement' || docType === 'Pay Slip') && period && (
+          <div className="period-hint">{period}</div>
+        )}
       </td>
 
       <td>

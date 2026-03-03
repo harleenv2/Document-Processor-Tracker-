@@ -2,10 +2,14 @@ import multer from 'multer';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
+import fsPromises from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import { detectDocType } from './utils/detectDocType.js';
+import { analyzeDocument } from './utils/analyzeDocument.js';
+import { extractZip } from './utils/extractZip.js';
 
 const ALLOWED_MIMES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
+const ZIP_MIMES = new Set(['application/zip', 'application/x-zip-compressed']);
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB per file
 
 const storage = multer.diskStorage({
@@ -23,7 +27,8 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  if (ALLOWED_MIMES.has(file.mimetype)) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ALLOWED_MIMES.has(file.mimetype) || ZIP_MIMES.has(file.mimetype) || ext === '.zip') {
     cb(null, true);
   } else {
     cb(new Error(`File type not allowed: ${file.mimetype}`), false);
@@ -40,7 +45,7 @@ export function uploadHandler(req, res) {
   // Assign a jobId before multer runs so the storage dest can use it
   req.jobId = uuidv4();
 
-  upload.array('files', 50)(req, res, (err) => {
+  upload.array('files', 50)(req, res, async (err) => {
     if (err) {
       return res.status(400).json({ error: err.message });
     }
@@ -49,13 +54,69 @@ export function uploadHandler(req, res) {
       return res.status(400).json({ error: 'No files uploaded.' });
     }
 
-    const files = req.files.map((f) => ({
-      fileId: path.basename(f.filename, path.extname(f.filename)),
-      originalName: f.originalname,
-      size: f.size,
-      mimeType: f.mimetype,
-      detectedDocType: detectDocType(f.originalname),
-    }));
+    const uploadsDir = path.join(os.tmpdir(), 'credit-ops', req.jobId, 'uploads');
+    const toAnalyse = [];
+
+    for (const f of req.files) {
+      const ext = path.extname(f.originalname).toLowerCase();
+      if (ZIP_MIMES.has(f.mimetype) || ext === '.zip') {
+        const extracted = await extractZip(f.path, uploadsDir);
+        await fsPromises.unlink(f.path);
+        toAnalyse.push(...extracted);
+      } else {
+        toAnalyse.push({
+          fileId: path.basename(f.filename, path.extname(f.filename)),
+          savedPath: f.path,
+          mimeType: f.mimetype,
+          originalName: f.originalname,
+          size: f.size,
+          fromZip: false,
+        });
+      }
+    }
+
+    if (toAnalyse.length === 0) {
+      return res.status(400).json({ error: 'ZIP was empty or contained no supported files.' });
+    }
+
+    // Run AI analysis for all files in parallel
+    const analysisResults = await Promise.allSettled(
+      toAnalyse.map((f) => analyzeDocument(f.savedPath, f.mimeType))
+    );
+
+    const files = toAnalyse.map((f, i) => {
+      const result = analysisResults[i];
+      if (result.status === 'fulfilled') {
+        return {
+          fileId: f.fileId,
+          originalName: f.originalName,
+          size: f.size,
+          mimeType: f.mimeType,
+          detectedDocType: result.value.docType,
+          personName: result.value.personName,
+          period: result.value.period,
+          periodStart: result.value.periodStart,
+          periodEnd: result.value.periodEnd,
+          aiAnalyzed: true,
+          fromZip: f.fromZip,
+        };
+      } else {
+        // AI failed — fall back to filename-based detection
+        return {
+          fileId: f.fileId,
+          originalName: f.originalName,
+          size: f.size,
+          mimeType: f.mimeType,
+          detectedDocType: detectDocType(f.originalName),
+          personName: '',
+          period: null,
+          periodStart: null,
+          periodEnd: null,
+          aiAnalyzed: false,
+          fromZip: f.fromZip,
+        };
+      }
+    });
 
     // Schedule auto-cleanup after 1 hour
     scheduleCleanup(req.jobId);
