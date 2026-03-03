@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import fs from 'fs/promises';
-import { extractWithAzure } from './extractWithAzure.js';
+import { extractText } from './extractText.js';
 
 const client = new Anthropic();
 
@@ -54,10 +54,10 @@ Analyse the document and return a JSON object with exactly five fields:
 Return ONLY valid JSON, no markdown, no explanation.`;
 
 export async function analyzeDocument(filePath, mimeType) {
-  // Run Azure OCR and file read in parallel
-  const [buffer, azureText] = await Promise.all([
+  // Run text extraction and file read in parallel
+  const [buffer, extractedText] = await Promise.all([
     fs.readFile(filePath),
-    extractWithAzure(filePath),
+    extractText(filePath, mimeType),
   ]);
 
   const base64 = buffer.toString('base64');
@@ -66,12 +66,12 @@ export async function analyzeDocument(filePath, mimeType) {
     ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
     : { type: 'image',    source: { type: 'base64', media_type: mimeType,           data: base64 } };
 
-  // Build user message — inject Azure-extracted text if available
+  // Build user message — inject extracted text if available
   const userContent = [contentBlock];
-  if (azureText) {
+  if (extractedText) {
     userContent.push({
       type: 'text',
-      text: `Extracted text from document:\n${azureText}\n\nUse this extracted text to assist your analysis.`,
+      text: `Extracted text from document:\n${extractedText}\n\nUse this extracted text to assist your analysis.`,
     });
   }
   userContent.push({ type: 'text', text: 'Analyse this document.' });
