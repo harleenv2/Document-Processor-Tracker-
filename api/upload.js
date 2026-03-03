@@ -87,6 +87,14 @@ export function uploadHandler(req, res) {
       const batchResults = await Promise.allSettled(
         batch.map((f) => analyzeDocument(f.savedPath, f.mimeType))
       );
+      batchResults.forEach((r, j) => {
+        const f = batch[j];
+        if (r.status === 'fulfilled') {
+          console.log(`[AI] ✓ ${f.originalName} → ${r.value.docType} / "${r.value.personName}"`);
+        } else {
+          console.error(`[AI] ✗ ${f.originalName} → FAILED: ${r.reason?.message}`);
+        }
+      });
       analysisResults.push(...batchResults);
     }
 
