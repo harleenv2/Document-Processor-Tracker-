@@ -64,11 +64,14 @@ export async function analyzeDocument(filePath, mimeType) {
   // If we have good extracted text, send ONLY the text to Claude (much lower token cost).
   // Only fall back to sending the raw file when there is no text (e.g. scanned image with no OCR).
   const TEXT_THRESHOLD = 80; // chars — anything shorter is unreliable
-  const TEXT_LIMIT = 4000;   // truncate to keep tokens low
 
   let userContent;
   if (extractedText && extractedText.length >= TEXT_THRESHOLD) {
-    const snippet = extractedText.slice(0, TEXT_LIMIT);
+    // Send first 3000 chars (doc type header) + last 1500 chars (signatures/names often at end)
+    // This keeps token cost low while capturing names that appear at the bottom of long forms
+    const head = extractedText.slice(0, 3000);
+    const tail = extractedText.length > 3000 ? extractedText.slice(-1500) : '';
+    const snippet = tail ? `${head}\n\n[...]\n\n${tail}` : head;
     userContent = [
       { type: 'text', text: `Extracted text from document:\n${snippet}\n\nAnalyse this document.` },
     ];
