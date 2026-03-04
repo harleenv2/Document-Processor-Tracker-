@@ -1,14 +1,43 @@
-// Text extraction pipeline — three strategies in priority order:
+// Text extraction pipeline — strategies in priority order:
 // 1. pdf-parse: for PDFs with a text layer (fast, free, no API needed)
+//    + pdf-lib form fields: captures filled-in values from fillable PDF forms
 // 2. Google Cloud Vision: for scanned PDFs and images (best accuracy)
 // 3. tesseract.js: for images when Google Vision is not configured (free, local)
 // Falls back gracefully to null (Claude-only) on any failure.
 
 import fs from 'fs/promises';
 import { createRequire } from 'module';
+import { PDFDocument } from 'pdf-lib';
 
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
+
+// ── PDF form field extraction ─────────────────────────────────────────────────
+
+async function extractFormFields(buffer) {
+  try {
+    const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
+    const form = pdfDoc.getForm();
+    const fields = form.getFields();
+    if (fields.length === 0) return null;
+
+    const lines = [];
+    for (const field of fields) {
+      try {
+        const name = field.getName();
+        let value = '';
+        const type = field.constructor.name;
+        if (type === 'PDFTextField') value = field.getText() ?? '';
+        else if (type === 'PDFDropdown') value = field.getSelected()?.join(', ') ?? '';
+        else if (type === 'PDFCheckBox') value = field.isChecked() ? 'Yes' : '';
+        if (value.trim()) lines.push(`${name}: ${value.trim()}`);
+      } catch { /* skip unreadable field */ }
+    }
+    return lines.length > 0 ? lines.join('\n') : null;
+  } catch {
+    return null;
+  }
+}
 
 // ── Google Cloud Vision ──────────────────────────────────────────────────────
 
@@ -88,11 +117,19 @@ async function tesseractOcr(filePath) {
 export async function extractText(filePath, mimeType) {
   try {
     if (mimeType === 'application/pdf') {
-      // Try text layer first (instant, free)
       const buffer = await fs.readFile(filePath);
-      const data = await pdfParse(buffer);
-      const text = data.text?.trim();
-      if (text?.length > 0) return text;
+
+      // Run text layer + form field extraction in parallel
+      const [parseData, formFields] = await Promise.all([
+        pdfParse(buffer).catch(() => null),
+        extractFormFields(buffer),
+      ]);
+
+      const layerText = parseData?.text?.trim() || '';
+
+      // Combine: put form fields first (they contain actual values like names)
+      const combined = [formFields, layerText].filter(Boolean).join('\n\n---\n\n');
+      if (combined.length > 0) return combined;
 
       // Scanned PDF — use Google Vision if available
       return await visionOcr(filePath, mimeType);

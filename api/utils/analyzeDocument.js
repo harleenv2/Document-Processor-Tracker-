@@ -55,26 +55,31 @@ Return ONLY valid JSON, no markdown, no explanation.`;
 
 export async function analyzeDocument(filePath, mimeType) {
   // Run text extraction and file read in parallel
+  // For images we always need the buffer; for PDFs we only need it if OCR fails
   const [buffer, extractedText] = await Promise.all([
     fs.readFile(filePath),
     extractText(filePath, mimeType),
   ]);
 
-  const base64 = buffer.toString('base64');
+  // If we have good extracted text, send ONLY the text to Claude (much lower token cost).
+  // Only fall back to sending the raw file when there is no text (e.g. scanned image with no OCR).
+  const TEXT_THRESHOLD = 80; // chars — anything shorter is unreliable
+  const TEXT_LIMIT = 4000;   // truncate to keep tokens low
 
-  const contentBlock = mimeType === 'application/pdf'
-    ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
-    : { type: 'image',    source: { type: 'base64', media_type: mimeType,           data: base64 } };
-
-  // Build user message — inject extracted text if available
-  const userContent = [contentBlock];
-  if (extractedText) {
-    userContent.push({
-      type: 'text',
-      text: `Extracted text from document:\n${extractedText}\n\nUse this extracted text to assist your analysis.`,
-    });
+  let userContent;
+  if (extractedText && extractedText.length >= TEXT_THRESHOLD) {
+    const snippet = extractedText.slice(0, TEXT_LIMIT);
+    userContent = [
+      { type: 'text', text: `Extracted text from document:\n${snippet}\n\nAnalyse this document.` },
+    ];
+  } else {
+    // No usable text — send the file directly (image or scanned PDF)
+    const base64 = buffer.toString('base64');
+    const contentBlock = mimeType === 'application/pdf'
+      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
+      : { type: 'image',    source: { type: 'base64', media_type: mimeType,           data: base64 } };
+    userContent = [contentBlock, { type: 'text', text: 'Analyse this document.' }];
   }
-  userContent.push({ type: 'text', text: 'Analyse this document.' });
 
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',
